@@ -90,7 +90,7 @@ def check_response(response):
 
     missed_keys = {'homeworks', 'current_date'} - response.keys()
     if missed_keys:
-        logger.error(f'В ответе API нет ожидаемых ключей: {missed_keys}')  
+        logger.error(f'В ответе API нет ожидаемых ключей: {missed_keys}')
 
     if not isinstance(response.get('homeworks'), list):
         logger.error('Тип данных ответа не список')
