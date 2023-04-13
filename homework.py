@@ -5,7 +5,7 @@ import sys
 import requests
 from http import HTTPStatus
 import telegram
-from exceptions import RequestError, HTTPRequestError
+from exceptions import HTTPRequestError, InvalidResponseCode
 
 from dotenv import load_dotenv
 
@@ -41,20 +41,13 @@ HOMEWORK_VERDICTS = {
 
 def check_tokens():
     """Проверка переменных."""
-    list_verible = [
-        PRACTICUM_TOKEN,
-        TELEGRAM_CHAT_ID,
-        TELEGRAM_TOKEN
-    ]
-    try:
-        return all(list_verible)
-    except Exception as error:
-        logging.error(f'Отсутсвует глобальная переменная: {error}')
+    return all((PRACTICUM_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_TOKEN))
 
 
 def send_message(bot, message):
     """Отправка сообщения."""
     try:
+        logging.info('Начало отправки сообщения')
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.debug(f'Сообщение в Telegram отправлено: {message}')
     except Exception as error:
@@ -69,11 +62,20 @@ def get_api_answer(timestamp):
             ENDPOINT, headers=HEADERS, params=params
         )
     except requests.RequestException:
-        logging.error('Ошибка RequestError')
+        logging.error(
+            'Ошибка запроса.'
+            f'Текст ошибки {response.text}'
+        )
     if response.status_code != HTTPStatus.OK:
-        raise HTTPRequestError(response)
+        raise InvalidResponseCode(
+            'Не верный код ответа.'
+            f'Код ответа: {response.status_code}'
+        )
     if response is None:
-        raise RequestError(response)
+        raise HTTPRequestError(
+            'Ошибка, возвращающая код ответа от API.'
+            f'Ответ: {response.reason}'
+        )
     return response.json()
 
 
@@ -86,9 +88,9 @@ def check_response(response):
         logging.error('Тип данных ответа не словарь')
         raise TypeError('Тип данных ответа не словарь')
 
-    if 'homeworks' not in response:
-        logging.error('Отсутсвует ключ "homeworks"')
-        raise KeyError('Отсутсвует ключ "homeworks"')
+    missed_keys = {'homeworks', 'current_date'} - response.keys()
+    if missed_keys:
+        logger.error(f'В ответе API нет ожидаемых ключей: {missed_keys}')  
 
     if not isinstance(response.get('homeworks'), list):
         logger.error('Тип данных ответа не список')
@@ -121,14 +123,11 @@ def main():
             'Отсутствует обязательная переменная окружения.'
             'Программа принудительно остановлена.'
         )
-        exit(
-            'Отсутствует обязательная переменная окружения.'
-            'Программа принудительно остановлена.'
-        )
+        sys.exit("Отсутствует обязательная переменная окружения")
 
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
-    timestamp = int(time.time())
     while True:
+        timestamp = int(time.time())
         try:
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
