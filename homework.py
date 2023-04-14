@@ -6,6 +6,8 @@ import requests
 from http import HTTPStatus
 import telegram
 from exceptions import HTTPRequestError, InvalidResponseCode
+import calendar
+import datetime
 
 from dotenv import load_dotenv
 
@@ -64,7 +66,7 @@ def get_api_answer(timestamp):
     except requests.RequestException:
         logging.error(
             'Ошибка запроса.'
-            f'Текст ошибки {response.text}'
+            f'Параметры запроса: {response.url}, {response.request}'
         )
     if response.status_code != HTTPStatus.OK:
         raise InvalidResponseCode(
@@ -124,10 +126,9 @@ def main():
             'Программа принудительно остановлена.'
         )
         sys.exit("Отсутствует обязательная переменная окружения")
-
+    timestamp = int(time.time())
     bot = telegram.Bot(token=TELEGRAM_TOKEN)
     while True:
-        timestamp = int(time.time())
         try:
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
@@ -138,6 +139,8 @@ def main():
                 if last_send.get(homework['homework_name']) != message:
                     send_message(bot, message)
                     last_send[homework['homework_name']] = message
+            date = datetime.datetime.utcnow()
+            timestamp = calendar.timegm(date.utctimetuple())
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
